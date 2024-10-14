@@ -8,6 +8,7 @@ import math
 # Variable 약속
 # Class : 대소대소 ex) ClassLikeBMW
 # Variable, Function : 소대소 ex) somethingGood
+# 뭔가 중요한 Variable : 대소대소 ex) SomethingImportant
 
 
 
@@ -36,9 +37,9 @@ class ActivationFunctions:
 
 # Model Function
 class ModelFunctions:
-	def addDense(self, inputShape : int, activationFunction):
+	def addDense(self, count : int, activationFunction = None):
 		return {
-			'inputShape' : inputShape,
+			'count' : count,
 			'activationFunction' : activationFunction
 		}
 
@@ -94,15 +95,59 @@ for rawTxt in rawTexts[1:]:
 dataXChangeDict, dataX = multipleUnique(dataX)
 dataYChangeDict, dataY = singleUnique(dataY)
 
-# Let's model~~~~~~
+# Let's make model~~~~~~
 modelFunction = ModelFunctions()
 activationFunction = ActivationFunctions()
 
 ModelStructure = [
-	modelFunction.addDense(len(dataX[0]), activationFunction.relu),
+	modelFunction.addDense(len(dataX[0])),
 	modelFunction.addDense(16, activationFunction.relu),
-	modelFunction.addDense(16, activationFunction.sigmoid)
+	modelFunction.addDense(1, activationFunction.sigmoid)
 ]
 
 
-# make Weight
+# make Weight (without bias)
+# rule
+# 1. split weight between stack (1~2 / 2~3)
+# 2. split weight by next variable
+# set initial weight by random (-2 ~ 2)
+import random
+
+Weights = [
+	[
+		[
+			(random.random() - 0.5)*2 for k in range(ModelStructure[i]['count'])
+   		] 
+		for j in range(ModelStructure[i+1]['count'])
+	] 
+	for i in range(len(ModelStructure) - 1)
+]
+
+# cost function (MSE)
+def mse(d1, d2):
+	return (d1-d2) * (d1-d2)
+
+# predict Function
+import copy
+
+def predict(model : list, weights : list, data : list):
+	neuronDatas = copy.deepcopy(data)
+	for k, weightBox in enumerate(weights):
+		functionToUse = model[k+1]['activationFunction']
+
+
+		nextNeuronDatas = []
+		for weightToMultiply in weightBox:
+			tmp = 0
+			for i, weight in enumerate(weightToMultiply):
+				tmp += weight * neuronDatas[i]
+			nextNeuronDatas.append(functionToUse(tmp))
+
+		neuronDatas = nextNeuronDatas.copy()
+	return neuronDatas
+
+print(ModelStructure)
+for i in range(99):
+	prediction = predict(ModelStructure, Weights, dataX[i])[0]
+	actual = dataY[i]
+	print(prediction, actual, mse(prediction, actual))
