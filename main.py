@@ -34,6 +34,23 @@ class ActivationFunctions:
 		eP = math.exp(x) # exp Positive
 		eN = math.exp(-x) # exp Negative
 		return (eP - eN) / (eP + eN)
+	
+	def nothing(self, x : float):
+		"""
+		x => x
+		"""
+		return x
+	
+import math
+# Sigmoid -1
+def sigmoidInverse(x : float):
+	k = (1/x)-1
+	# print(k)
+	if k <= 0.1:
+		return -100
+	elif k >= 0.9:
+		return 100
+	return -math.log(k, math.e)
 
 # Model Function
 class ModelFunctions:
@@ -140,9 +157,9 @@ def predict(model : list, weights : list, data : list, returnNeuronStacks : bool
 
 
 		nextNeuronDatas = []
-		for weightToMultiply in weightBox:
+		for weightLines in weightBox:
 			tmp = 0
-			for i, weight in enumerate(weightToMultiply):
+			for i, weight in enumerate(weightLines):
 				tmp += weight * neuronDatas[i]
 			nextNeuronDatas.append(functionToUse(tmp))
 
@@ -155,16 +172,6 @@ def predict(model : list, weights : list, data : list, returnNeuronStacks : bool
 		return neuronDatas
 
 # predict and score
-correctCount = 0
-for i in range(dataCount):
-	prediction = predict(ModelStructure, Weights, dataX[i])[0]
-	actual = dataY[i]
-	# print(prediction, actual, mse(prediction, actual))
-	if abs(prediction - actual) < 0.5:
-		correctCount += 1
-
-print(f"data {dataCount}, correct : {correctCount}, acc : {int(correctCount/dataCount*10000)/100} %")
-
 def predictAllAndScore(ModelStructure, Weights, dataX, dataY):
 	correctCount = 0
 	for i in range(dataCount):
@@ -176,6 +183,7 @@ def predictAllAndScore(ModelStructure, Weights, dataX, dataY):
 
 	print(f"data {dataCount}, correct : {correctCount}, acc : {int(correctCount/dataCount*10000)/100} %")
 
+predictAllAndScore(ModelStructure, Weights, dataX, dataY)
 
 # Back Propagation
 import copy
@@ -190,27 +198,95 @@ initialNextWeights = [
 	for i in range(len(ModelStructure) - 1)
 ]
 
+initialNeurons = [
+	[
+		0 for _ in range(struct['count'])
+	]
+	for struct in ModelStructure
+]
+
+
+# batchCount = 16
+
+# targetDataNum = -1
+# for loop in range(int(dataCount/batchCount)):
+# 	nextWeights = initialNextWeights.copy()
+
+# 	for batchLoop in range(batchCount):
+# 		targetDataNum += 1
+
+# 		_, Neurons = predict(ModelStructure, Weights, dataX[targetDataNum], True)
+# 		Answer = [dataY[targetDataNum]]
+
+# 		# Weights
+
+# 		for i in range(len(Weights)):
+# 			targetWeights = Weights[-1 -i]
+# 			targetNeurons = Neurons[-1 -i]
+# 			beforeNeurons = Neurons[-2 -i]
+
+# 			needs = [ans - pre for ans, pre in zip(Answer, targetNeurons)]
+# 			# print(needs, Answer, targetNeurons)
+
+# 			for j in range(len(targetNeurons)):
+# 				cont = [abs(w * x) for w, x in zip(targetWeights[j], beforeNeurons)]
+# 				contSum = sum(cont)
+# 				if contSum == 0:
+# 					continue
+# 				for k, con in enumerate(cont):
+# 					n = con / contSum * needs[j]
+# 					nextWeights[-1 - i][j][k] += n
+
+# 			Answer = copy.deepcopy(beforeNeurons)
+
+
+# 	for i in range(len(Weights)):
+# 		for j in range(len(Weights[i])):
+# 			for k in range(len(Weights[i][j])):
+# 				Weights[i][j][k] = Weights[i][j][k] + nextWeights[i][j][k] / batchCount
+	
+# 	print(f"{loop} / {int(dataCount/batchCount)}")
+# 	predictAllAndScore(ModelStructure, Weights, dataX, dataY)
+
+
+# 지금은 한 개씩 back 을 진행하는데
+# 계층 단위로 batch 하고 평균, 으로 하는 게 맞을 듯
+
 
 batchCount = 16
 
 targetDataNum = -1
 for loop in range(int(dataCount/batchCount)):
-	nextWeights = initialNextWeights.copy()
+
+	NeuronList = []
+	AnswerList = []
 
 	for batchLoop in range(batchCount):
 		targetDataNum += 1
-
 		_, Neurons = predict(ModelStructure, Weights, dataX[targetDataNum], True)
 		Answer = [dataY[targetDataNum]]
+		NeuronList.append(Neurons)
+		AnswerList.append(Answer)
+
+	for i in range(len(Weights)):
 
 		# Weights
 
-		for i in range(len(Weights)):
-			targetWeights = Weights[-1 -i]
-			targetNeurons = Neurons[-1 -i]
-			beforeNeurons = Neurons[-2 -i]
+		nextWeights = initialNextWeights.copy()
 
-			needs = [ans - pre for ans, pre in zip(Answer, targetNeurons)]
+		targetWeights = Weights[-1 -i]
+		targetNeurons = Neurons[-1 -i]
+		beforeNeurons = Neurons[-2 -i]
+
+		nextNeurons = beforeNeurons.copy()
+		# print(nextNeurons)
+
+
+		for batchLoop in range(batchCount):
+			if i == 0:
+				needs = [ans - pre for ans, pre in zip(AnswerList[batchLoop], targetNeurons)]
+			else:
+				needs = [ans - pre for ans, pre in zip(AnswerList, targetNeurons)]
 			# print(needs, Answer, targetNeurons)
 
 			for j in range(len(targetNeurons)):
@@ -221,19 +297,23 @@ for loop in range(int(dataCount/batchCount)):
 				for k, con in enumerate(cont):
 					n = con / contSum * needs[j]
 					nextWeights[-1 - i][j][k] += n
+					nextNeurons[k] += n
 
-			Answer = copy.deepcopy(beforeNeurons)
+					# print(i, k, nextNeurons)
 
 
-	for i in range(len(Weights)):
-		for j in range(len(Weights[i])):
-			for k in range(len(Weights[i][j])):
-				Weights[i][j][k] = nextWeights[i][j][k] / batchCount
+		for i in range(len(Weights)):
+			for j in range(len(Weights[i])):
+				for k in range(len(Weights[i][j])):
+					Weights[i][j][k] += nextWeights[i][j][k] / batchCount
+					# if i == 0:
+					# 	Weights[i][j][k] = sigmoidInverse(Weights[i][j][k])
+
+		for i in range(len(nextNeurons)):
+			nextNeurons[i] = nextNeurons[i] / len(targetNeurons)
+		# print(Weights)
+					
+		AnswerList = nextNeurons.copy()
 	
 	print(f"{loop} / {int(dataCount/batchCount)}")
 	predictAllAndScore(ModelStructure, Weights, dataX, dataY)
-
-
-
-# 지금은 한 개씩 back 을 진행하는데
-# 계층 단위로 batch 하고 평균, 으로 하는 게 맞을 듯
